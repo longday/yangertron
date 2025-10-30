@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
+cd "$ROOT_DIR"
 pnpm install --frozen-lockfile
 
 electron_pkg_json="$(node -p "require.resolve('electron/package.json')")"
@@ -20,5 +21,5 @@ if [[ -f /etc/os-release ]] && grep -q '^ID=nixos' /etc/os-release; then
 	cmd=(steam-run "${cmd[@]}")
 fi
 
-cd "$ROOT_DIR"
+
 exec "${cmd[@]}"
