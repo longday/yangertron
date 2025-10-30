@@ -40,6 +40,6 @@ export const loadCloseToTray = (store: SettingsStore): boolean => {
 };
 
 export const loadShowOnStartup = (store: SettingsStore): boolean => {
-  const candidate = store.get("showOnStartup", false);
-  return typeof candidate === "boolean" ? candidate : false;
+  const candidate = store.get("showOnStartup", true);
+  return typeof candidate === "boolean" ? candidate : true;
 };
