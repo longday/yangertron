@@ -34,14 +34,28 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
   };
   let fallbackIcon = nativeImage.createEmpty();
 
+  const resizeForTray = (icon: Electron.NativeImage): Electron.NativeImage => {
+    const targetSize = process.platform === "darwin" ? 22 : 64;
+    const resized = icon.resize({
+      width: targetSize,
+      height: targetSize,
+      quality: "best",
+    });
+
+    if (process.platform === "darwin") {
+      resized.setTemplateImage(true);
+    }
+
+    return resized;
+  };
+
   const loadIcon = (iconPath: string) => {
     const icon = nativeImage.createFromPath(iconPath);
     if (icon.isEmpty()) {
-      log.warn(`[tray] icon not found at ${iconPath}`);
       return icon;
     }
-
-    return icon.resize({ width: 64, height: 64, quality: "best" });
+    const resized = resizeForTray(icon);
+    return resized;
   };
 
   const refreshIcons = () => {
@@ -51,7 +65,7 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     const baseFallback = nativeImage.createFromPath(options.fallbackIconPath);
     fallbackIcon = baseFallback.isEmpty()
       ? baseFallback
-      : baseFallback.resize({ width: 64, height: 64, quality: "best" });
+      : resizeForTray(baseFallback);
   };
 
   const resolveIcon = (variant: TrayVariant) => {
@@ -84,7 +98,6 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     }
 
     refreshIcons();
-
     const image = resolveIcon("blue");
     tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
     tray.setToolTip("Yandex Messenger");
