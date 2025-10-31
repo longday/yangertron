@@ -14,7 +14,19 @@ The repository assumes a recent Node.js LTS release and `pnpm` are installed on 
 ./start.sh
 ```
 
+On Linux desktops, the `scripts/linux-install-entity.sh` helper registers a menu entry that launches the app through `start.sh`. The script was authored for KDE Plasma and has been verified there, but it should work on other modern distributions with minor adjustments.
+
 The script reuses the existing Electron install when available and falls back to `steam-run` automatically on NixOS.
+
+## Managed mode
+
+After you authenticate in Yangertron, enable **Managed Mode** from the application menu. Once active, the mode:
+
+- registers the external link handler so every Yandex 360 Messenger link opens in your system browser;
+- hides the left navigation rail for a cleaner workspace;
+- disables analytics collection inside the embedded workspace.
+
+![Managed Mode toggle in the application menu](misc/menu-screenshot.png)
 
 ## Next steps
 
