@@ -181,8 +181,26 @@ app.on("activate", () => {
   mainWindow?.focus();
 });
 
-app.whenReady().then(() => {
-  ensureWindow();
-  trayManager.ensure();
-  updateTrayState();
-});
+const singleInstanceLock = app.requestSingleInstanceLock();
+
+if (!singleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized() || !mainWindow.isVisible()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      ensureWindow();
+    }
+  });
+
+  app.whenReady().then(() => {
+    ensureWindow();
+    trayManager.ensure();
+    updateTrayState();
+  });
+}
