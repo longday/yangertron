@@ -30,10 +30,6 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     blue: nativeImage.createEmpty(),
     red: nativeImage.createEmpty(),
   };
-  const dockIcons: Record<TrayVariant, Electron.NativeImage> = {
-    blue: nativeImage.createEmpty(),
-    red: nativeImage.createEmpty(),
-  };
   let fallbackIcon = nativeImage.createEmpty();
 
   const resizeForTray = (icon: Electron.NativeImage): Electron.NativeImage => {
@@ -66,8 +62,6 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
   const refreshIcons = () => {
     trayIcons.blue = loadIcon(options.blueIconPath);
     trayIcons.red = loadIcon(options.redIconPath);
-    dockIcons.blue = loadIcon(options.blueIconPath, { original: true });
-    dockIcons.red = loadIcon(options.redIconPath, { original: true });
     const baseFallback = nativeImage.createFromPath(options.fallbackIconPath);
     fallbackIcon = baseFallback.isEmpty()
       ? baseFallback
@@ -91,12 +85,11 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     const image = resolveIcon(variant);
     const icon = image.isEmpty() ? fallbackIcon : image;
     tray.setImage(icon);
-    app.dock?.setIcon(icon);
-    tray.setToolTip(
+    const tooltipMessage =
       variant === "red"
         ? "Yandex Messenger — new notifications"
-        : "Yandex Messenger",
-    );
+        : "Yandex Messenger";
+    tray.setToolTip(tooltipMessage);
     currentVariant = variant;
   };
 
@@ -104,7 +97,6 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     if (tray) {
       return tray;
     }
-
     refreshIcons();
     const image = resolveIcon("blue");
     tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
@@ -129,9 +121,7 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
 
     tray.setContextMenu(contextMenu);
     tray.on("click", options.onToggle);
-
     setTrayIcon("blue");
-
     return tray;
   };
 
@@ -139,7 +129,11 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     if (!tray) {
       ensure();
     }
-
+    if (alert) {
+      app.dock?.setBadge("•");
+    } else {
+      app.dock?.setBadge("");
+    }
     const nextVariant: TrayVariant = alert ? "red" : "blue";
     if (currentVariant !== nextVariant) {
       setTrayIcon(nextVariant);
@@ -150,6 +144,8 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     tray?.destroy();
     tray = null;
   };
+
+  app.dock?.setIcon(loadIcon(options.blueIconPath, { original: true }));
 
   return {
     ensure,
