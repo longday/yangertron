@@ -1,6 +1,4 @@
-import { Menu, Tray, nativeImage } from "electron";
-
-import { log } from "./utils/logger";
+import { Menu, Tray, app, nativeImage } from "electron";
 
 export type TrayVariant = "blue" | "red";
 
@@ -32,6 +30,10 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     blue: nativeImage.createEmpty(),
     red: nativeImage.createEmpty(),
   };
+  const dockIcons: Record<TrayVariant, Electron.NativeImage> = {
+    blue: nativeImage.createEmpty(),
+    red: nativeImage.createEmpty(),
+  };
   let fallbackIcon = nativeImage.createEmpty();
 
   const resizeForTray = (icon: Electron.NativeImage): Electron.NativeImage => {
@@ -49,9 +51,12 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     return resized;
   };
 
-  const loadIcon = (iconPath: string) => {
+  const loadIcon = (iconPath: string, options: { original?: boolean } = {}) => {
     const icon = nativeImage.createFromPath(iconPath);
     if (icon.isEmpty()) {
+      return icon;
+    }
+    if (options.original) {
       return icon;
     }
     const resized = resizeForTray(icon);
@@ -61,7 +66,8 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
   const refreshIcons = () => {
     trayIcons.blue = loadIcon(options.blueIconPath);
     trayIcons.red = loadIcon(options.redIconPath);
-
+    dockIcons.blue = loadIcon(options.blueIconPath, { original: true });
+    dockIcons.red = loadIcon(options.redIconPath, { original: true });
     const baseFallback = nativeImage.createFromPath(options.fallbackIconPath);
     fallbackIcon = baseFallback.isEmpty()
       ? baseFallback
@@ -83,7 +89,9 @@ export function createTrayManager(options: TrayManagerOptions): TrayManager {
     }
 
     const image = resolveIcon(variant);
-    tray.setImage(image.isEmpty() ? nativeImage.createEmpty() : image);
+    const icon = image.isEmpty() ? fallbackIcon : image;
+    tray.setImage(icon);
+    app.dock?.setIcon(icon);
     tray.setToolTip(
       variant === "red"
         ? "Yandex Messenger — new notifications"
