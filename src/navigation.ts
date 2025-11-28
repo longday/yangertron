@@ -54,14 +54,26 @@ export function createNavigationHelpers(appUrl: string): NavigationHelpers {
     }
   };
 
+  const openWithShell = (url: string) => {
+    log.info("Attempting to open external URL via shell", { url });
+
+    shell
+      .openExternal(url)
+      .then(() => {
+        log.info("shell.openExternal handed off to system", { url });
+      })
+      .catch((error) => {
+        log.error("shell.openExternal failed", { url, error });
+      });
+  };
+
   const openExternal = (url: string) => {
     if (!url) {
+      log.warn("openExternal called without a URL");
       return;
     }
 
-    shell.openExternal(url).catch((error) => {
-      log.error("Failed to open external URL", url, error);
-    });
+    openWithShell(url);
   };
 
   return {

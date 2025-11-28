@@ -7,7 +7,7 @@ Yangertron (**YAN**dex messen**GER** elec**TRON**) is an unofficial Yandex 360 M
 - System tray icon that changes colour to highlight unread messages.
 - Closing the window keeps the app running in the tray for quick re-entry.
 - Native access to the camera, microphone, and screen sharing for calls and presentations.
-- Managed Mode externalises links to your default browser, hides the in-app navigation rail, and blocks analytics collection.
+- Managed Mode externalises links to your default browser, hides the in-app navigation bar, and blocks analytics collection.
 
 ## Project status
 
