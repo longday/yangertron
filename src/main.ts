@@ -20,10 +20,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 const APP_ROOT = process.env.APP_ROOT;
-process.env.VITE_PUBLIC = APP_ROOT;
 
-const RUNTIME_DIR = path.join(APP_ROOT, ".runtime");
+// правильная runtime папка
+const RUNTIME_DIR = path.join(app.getPath("userData"), ".runtime");
+
 mkdirSync(RUNTIME_DIR, { recursive: true });
+
 app.setPath("userData", RUNTIME_DIR);
 
 app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
