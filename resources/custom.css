@@ -1,3 +1,7 @@
 #app .yamb-root .yamb-global-bar {
   display: none !important;
 }
+#app .yamb-root .yamb-root__content_padded {
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
