@@ -19,6 +19,7 @@ const blockedPathFragments = [
   /\/analytics\//i,
   /\/collect/i,
   /\/watch/i,
+  /clck\/click/i,
 ];
 
 const rules: BlockRule[] = [
