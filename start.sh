@@ -12,7 +12,7 @@ if [[ ! -x "$electron_dir/dist/electron" ]]; then
 	(cd "$electron_dir" && node install.js)
 fi
 
-pnpm exec vite build
+pnpm run build:app
 
 cmd=(pnpm exec electron dist/main.js)
 

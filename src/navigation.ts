@@ -36,7 +36,7 @@ export function createNavigationHelpers(appUrl: string): NavigationHelpers {
       }
 
       return hostname === mainHost || hostname.endsWith(`.${mainHost}`);
-    } catch (_error) {
+    } catch {
       return false;
     }
   };
@@ -49,7 +49,7 @@ export function createNavigationHelpers(appUrl: string): NavigationHelpers {
       }
 
       return normalizePathname(parsed.pathname) === mainPathname;
-    } catch (_error) {
+    } catch {
       return false;
     }
   };

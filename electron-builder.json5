@@ -1,9 +1,9 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.longday.yangertron",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "Yangertron",
   "directories": {
     "output": "release/${version}"
   },
@@ -37,6 +37,7 @@
     "deleteAppDataOnUninstall": false
   },
   "linux": {
+    "category": "Network",
     "target": [
       "AppImage"
     ],

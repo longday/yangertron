@@ -63,7 +63,7 @@ function normalizeArg(value: unknown): unknown {
   if (typeof value === "object" && value !== null) {
     try {
       return JSON.parse(JSON.stringify(value));
-    } catch (_error) {
+    } catch {
       return inspect(value, inspectOptions);
     }
   }
