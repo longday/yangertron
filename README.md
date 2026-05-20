@@ -33,6 +33,32 @@ After you authenticate in Yangertron, enable **Managed Mode** from the applicati
 
 ![Managed Mode toggle in the application menu](misc/menu-screenshot.png)
 
+## Proxy profiles
+
+Available proxy servers live in the root-level `proxy.yml` file. The app reads that file on startup and exposes the configured profiles through the `Messenger` -> `Proxy` menu.
+
+If no profile is selected, Yangertron uses a direct connection.
+
+Changing the selected proxy only updates the saved preference. Restart the application manually to apply the new proxy profile.
+
+Example configuration:
+
+```yaml
+profiles:
+  - id: office
+    server: http://proxy.example.com:8080
+    bypassRules: <local>;localhost;127.0.0.1
+    username: corp-user
+    password: change-me
+
+  - id: backup
+    server: socks5://backup-proxy.example.com:1080
+```
+
+Only the selected profile id is persisted in `.runtime/settings.json`, so keep each profile `id` stable.
+
+For HTTP or HTTPS proxies that require authentication, add optional `username` and `password` fields to the profile. SOCKS proxy authentication is not supported by Chromium proxy rules.
+
 ## Next steps
 
 - Package production-ready builds with `electron-builder` once the application stabilises.

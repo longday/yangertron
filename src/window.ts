@@ -12,7 +12,6 @@ import { log } from "./utils/logger";
 type NavigationPhase = "start" | "finish" | "in-page";
 
 export interface MainWindowOptions {
-  appUrl: string;
   preloadDir: string;
   iconPath: string;
   userAgent: string;
@@ -318,8 +317,6 @@ export function createMainWindow(options: MainWindowOptions) {
     event.preventDefault();
     options.openExternal(url);
   });
-
-  browserWindow.loadURL(options.appUrl);
 
   return browserWindow;
 }

@@ -14,16 +14,16 @@
     "pnpm": ">=9.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "9.38.0",
     "@eslint/eslintrc": "3.3.1",
+    "@eslint/js": "9.38.0",
     "@typescript-eslint/eslint-plugin": "7.8.0",
     "@typescript-eslint/parser": "7.8.0",
     "electron": "39.0.0",
     "electron-builder": "25.1.8",
     "eslint": "9.38.0",
     "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-prettier": "5.5.4",
     "eslint-plugin-electron": "7.0.0",
+    "eslint-plugin-prettier": "5.5.4",
     "prettier": "3.6.2",
     "typescript": "5.9.3",
     "vite": "7.1.12",
@@ -31,5 +31,8 @@
     "vite-plugin-electron-renderer": "0.14.6"
   },
   "main": "dist/main.js",
-  "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee"
+  "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee",
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
 }

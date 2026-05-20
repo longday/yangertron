@@ -1,0 +1,10 @@
+# Available proxy profiles for Yangertron.
+# Keep `id` stable because only the selected id is stored in runtime settings.
+#
+# Example:
+# profiles:
+#   - id: office
+#     server: http://proxy.example.com:8080
+#     bypassRules: <local>;localhost;127.0.0.1
+#     username: corp-user
+#     password: change-me

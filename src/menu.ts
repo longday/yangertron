@@ -1,4 +1,11 @@
-import { BrowserWindow, Menu, MenuItem } from "electron";
+import {
+  BrowserWindow,
+  Menu,
+  MenuItem,
+  type MenuItemConstructorOptions,
+} from "electron";
+
+import type { ProxyProfile } from "./state/proxy";
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
@@ -11,6 +18,9 @@ export interface MessengerMenuOptions {
   onToggleCloseToTray(enabled: boolean): void;
   isShowOnStartupEnabled(): boolean;
   onToggleShowOnStartup(enabled: boolean): void;
+  proxyProfiles: ProxyProfile[];
+  getSelectedProxyId(): string | null;
+  onSelectProxy(proxyId: string | null): void | Promise<void>;
 }
 
 export function ensureMessengerMenu(
@@ -31,6 +41,33 @@ export function ensureMessengerMenu(
     );
     window.webContents.setZoomFactor(next);
   };
+
+  const proxyMenuItems: MenuItemConstructorOptions[] = [
+    {
+      label: "Restart app to apply proxy changes",
+      enabled: false,
+    },
+    { type: "separator" },
+    {
+      label: "Direct connection",
+      type: "radio",
+      checked: options.getSelectedProxyId() === null,
+      click: () => {
+        void options.onSelectProxy(null);
+      },
+    },
+  ];
+
+  for (const profile of options.proxyProfiles) {
+    proxyMenuItems.push({
+      label: profile.id,
+      type: "radio",
+      checked: options.getSelectedProxyId() === profile.id,
+      click: () => {
+        void options.onSelectProxy(profile.id);
+      },
+    });
+  }
 
   const messengerItem = new MenuItem({
     label: "Messenger",
@@ -58,6 +95,10 @@ export function ensureMessengerMenu(
         click: (menuItem) => {
           options.onToggleShowOnStartup(Boolean(menuItem.checked));
         },
+      },
+      {
+        label: "Proxy (restart required)",
+        submenu: proxyMenuItems,
       },
       { type: "separator" },
       {

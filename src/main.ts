@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, type Session } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { mkdirSync } from "node:fs";
@@ -8,6 +8,12 @@ import { createMainWindow } from "./window";
 import { ensureMessengerMenu } from "./menu";
 import { loadCustomCss } from "./mods/css";
 import { createSettingsStore, type WindowBounds } from "./state/window";
+import {
+  loadProxyProfiles,
+  loadSelectedProxyId,
+  persistSelectedProxyId,
+  type ProxyProfile,
+} from "./state/proxy";
 import { APP_URL, USER_AGENT, resolveIconPaths } from "./config";
 import {
   loadWindowBounds,
@@ -15,6 +21,7 @@ import {
   loadCloseToTray,
   loadShowOnStartup,
 } from "./state/helpers";
+import { log } from "./utils/logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +30,7 @@ const APP_ROOT = process.env.APP_ROOT;
 process.env.VITE_PUBLIC = APP_ROOT;
 
 const RUNTIME_DIR = path.join(APP_ROOT, ".runtime");
+const PROXY_CONFIG_PATH = path.join(APP_ROOT, "proxy.yml");
 mkdirSync(RUNTIME_DIR, { recursive: true });
 app.setPath("userData", RUNTIME_DIR);
 
@@ -37,13 +45,31 @@ const {
 } = resolveIconPaths(APP_ROOT);
 
 const navigation = createNavigationHelpers(APP_URL);
+const proxyProfiles = loadProxyProfiles(PROXY_CONFIG_PATH);
 
 let isQuitting = false;
 let mainWindow: BrowserWindow | null = null;
+let mainWindowPromise: Promise<BrowserWindow> | null = null;
 let windowBounds: WindowBounds = loadWindowBounds(settingsStore);
 let managedModeEnabled = loadManagedMode(settingsStore);
 let closeToTrayEnabled = loadCloseToTray(settingsStore);
 let showOnStartupEnabled = loadShowOnStartup(settingsStore);
+let selectedProxyId = loadSelectedProxyId(settingsStore);
+let activeProxyId: string | null = null;
+
+const isKnownProxyProfile = (proxyId: string | null): proxyId is string => {
+  return (
+    proxyId !== null && proxyProfiles.some((profile) => profile.id === proxyId)
+  );
+};
+
+if (!isKnownProxyProfile(selectedProxyId)) {
+  if (selectedProxyId !== null) {
+    log.warn(`[proxy] unknown stored profile id: ${selectedProxyId}`);
+  }
+  selectedProxyId = null;
+  persistSelectedProxyId(settingsStore, null);
+}
 
 const hasNotifications = (): boolean => {
   const title = mainWindow?.getTitle() ?? "";
@@ -53,9 +79,69 @@ const hasNotifications = (): boolean => {
 
 let updateTrayState: () => void = () => {};
 
-const ensureWindow = (): BrowserWindow => {
-  if (mainWindow) {
-    return mainWindow;
+const findProxyProfile = (proxyId: string | null): ProxyProfile | null => {
+  if (!proxyId) {
+    return null;
+  }
+
+  return proxyProfiles.find((profile) => profile.id === proxyId) ?? null;
+};
+
+const getActiveProxyProfile = (): ProxyProfile | null => {
+  return findProxyProfile(activeProxyId);
+};
+
+const applyProxyProfile = async (
+  session: Session,
+  proxyId: string | null,
+): Promise<boolean> => {
+  const profile = findProxyProfile(proxyId);
+  const nextActiveProxyId = profile?.id ?? null;
+
+  try {
+    if (profile) {
+      await session.setProxy({
+        mode: "fixed_servers",
+        proxyRules: profile.server,
+        proxyBypassRules: profile.bypassRules,
+      });
+      log.info(`[proxy] applied profile: ${profile.id}`);
+    } else {
+      await session.setProxy({ mode: "direct" });
+      log.info("[proxy] using direct connection");
+    }
+
+    await session.closeAllConnections();
+    activeProxyId = nextActiveProxyId;
+    return true;
+  } catch (error) {
+    log.error("[proxy] failed to apply proxy settings", error);
+    return false;
+  }
+};
+
+const focusWindow = (window: BrowserWindow) => {
+  window.show();
+  window.focus();
+};
+
+app.on("login", (event, _webContents, _request, authInfo, callback) => {
+  if (!authInfo.isProxy) {
+    return;
+  }
+
+  const profile = getActiveProxyProfile();
+  if (!profile?.username || profile.password === undefined) {
+    return;
+  }
+
+  event.preventDefault();
+  callback(profile.username, profile.password);
+});
+
+const ensureWindow = (): Promise<BrowserWindow> => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindowPromise ?? Promise.resolve(mainWindow);
   }
 
   const isManagedModeEnabled = () => managedModeEnabled;
@@ -63,7 +149,6 @@ const ensureWindow = (): BrowserWindow => {
   const isShowOnStartupEnabled = () => showOnStartupEnabled;
 
   mainWindow = createMainWindow({
-    appUrl: APP_URL,
     preloadDir: __dirname,
     iconPath: ICON_PATH,
     userAgent: USER_AGENT,
@@ -82,6 +167,7 @@ const ensureWindow = (): BrowserWindow => {
     onUrlChange: () => updateTrayState(),
     onClosed: () => {
       mainWindow = null;
+      mainWindowPromise = null;
     },
     isManagedModeEnabled,
   });
@@ -121,9 +207,32 @@ const ensureWindow = (): BrowserWindow => {
       showOnStartupEnabled = enabled;
       settingsStore.set("showOnStartup", enabled);
     },
+    proxyProfiles,
+    getSelectedProxyId: () => selectedProxyId,
+    onSelectProxy: (proxyId) => {
+      const nextProxyId = isKnownProxyProfile(proxyId) ? proxyId : null;
+      if (selectedProxyId === nextProxyId) {
+        return;
+      }
+
+      selectedProxyId = nextProxyId;
+      persistSelectedProxyId(settingsStore, nextProxyId);
+    },
   });
 
-  return mainWindow!;
+  mainWindowPromise = (async () => {
+    const targetWindow = mainWindow;
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      throw new Error("Main window is unavailable during initialization");
+    }
+
+    await applyProxyProfile(targetWindow.webContents.session, selectedProxyId);
+    await targetWindow.loadURL(APP_URL);
+
+    return targetWindow;
+  })();
+
+  return mainWindowPromise;
 };
 
 const trayManager = createTrayManager({
@@ -131,21 +240,29 @@ const trayManager = createTrayManager({
   redIconPath: TRAY_RED_ICON_PATH,
   fallbackIconPath: ICON_PATH,
   onShow: () => {
-    const window = ensureWindow();
-    window.show();
-    window.focus();
+    void ensureWindow()
+      .then((window) => {
+        focusWindow(window);
+      })
+      .catch((error) => {
+        log.error("[window] failed to show window", error);
+      });
   },
   onHide: () => {
     mainWindow?.hide();
   },
   onToggle: () => {
-    const window = ensureWindow();
-    if (window.isVisible()) {
-      window.hide();
-    } else {
-      window.show();
-      window.focus();
-    }
+    void ensureWindow()
+      .then((window) => {
+        if (window.isVisible()) {
+          window.hide();
+        } else {
+          focusWindow(window);
+        }
+      })
+      .catch((error) => {
+        log.error("[window] failed to toggle window", error);
+      });
   },
   onQuit: () => {
     isQuitting = true;
@@ -174,11 +291,19 @@ app.on("before-quit", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    ensureWindow();
+    void ensureWindow()
+      .then((window) => {
+        focusWindow(window);
+      })
+      .catch((error) => {
+        log.error("[window] failed to activate window", error);
+      });
+    return;
   }
 
-  mainWindow?.show();
-  mainWindow?.focus();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    focusWindow(mainWindow);
+  }
 });
 
 const singleInstanceLock = app.requestSingleInstanceLock();
@@ -191,16 +316,26 @@ if (!singleInstanceLock) {
       if (mainWindow.isMinimized() || !mainWindow.isVisible()) {
         mainWindow.restore();
       }
-      mainWindow.show();
-      mainWindow.focus();
+      focusWindow(mainWindow);
     } else {
-      ensureWindow();
+      void ensureWindow()
+        .then((window) => {
+          focusWindow(window);
+        })
+        .catch((error) => {
+          log.error("[window] failed to handle second instance", error);
+        });
     }
   });
 
   app.whenReady().then(() => {
-    ensureWindow();
-    trayManager.ensure();
-    updateTrayState();
+    void ensureWindow()
+      .then(() => {
+        trayManager.ensure();
+        updateTrayState();
+      })
+      .catch((error) => {
+        log.error("[window] failed during startup", error);
+      });
   });
 }
