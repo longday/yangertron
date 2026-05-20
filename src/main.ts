@@ -1,4 +1,4 @@
-import { app, BrowserWindow, type Session } from "electron";
+import { app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { mkdirSync } from "node:fs";
@@ -7,13 +7,8 @@ import { createTrayManager } from "./tray";
 import { createMainWindow } from "./window";
 import { ensureMessengerMenu } from "./menu";
 import { loadCustomCss } from "./mods/css";
+import { createProxyRuntime } from "./proxy/runtime";
 import { createSettingsStore, type WindowBounds } from "./state/window";
-import {
-  loadProxyProfiles,
-  loadSelectedProxyId,
-  persistSelectedProxyId,
-  type ProxyProfile,
-} from "./state/proxy";
 import { APP_URL, USER_AGENT, resolveIconPaths } from "./config";
 import {
   loadWindowBounds,
@@ -37,6 +32,10 @@ app.setPath("userData", RUNTIME_DIR);
 app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
 
 const settingsStore = createSettingsStore(RUNTIME_DIR);
+const proxyRuntime = createProxyRuntime({
+  configPath: PROXY_CONFIG_PATH,
+  settingsStore,
+});
 
 const {
   iconPath: ICON_PATH,
@@ -45,7 +44,6 @@ const {
 } = resolveIconPaths(APP_ROOT);
 
 const navigation = createNavigationHelpers(APP_URL);
-const proxyProfiles = loadProxyProfiles(PROXY_CONFIG_PATH);
 
 let isQuitting = false;
 let mainWindow: BrowserWindow | null = null;
@@ -54,22 +52,6 @@ let windowBounds: WindowBounds = loadWindowBounds(settingsStore);
 let managedModeEnabled = loadManagedMode(settingsStore);
 let closeToTrayEnabled = loadCloseToTray(settingsStore);
 let showOnStartupEnabled = loadShowOnStartup(settingsStore);
-let selectedProxyId = loadSelectedProxyId(settingsStore);
-let activeProxyId: string | null = null;
-
-const isKnownProxyProfile = (proxyId: string | null): proxyId is string => {
-  return (
-    proxyId !== null && proxyProfiles.some((profile) => profile.id === proxyId)
-  );
-};
-
-if (!isKnownProxyProfile(selectedProxyId)) {
-  if (selectedProxyId !== null) {
-    log.warn(`[proxy] unknown stored profile id: ${selectedProxyId}`);
-  }
-  selectedProxyId = null;
-  persistSelectedProxyId(settingsStore, null);
-}
 
 const hasNotifications = (): boolean => {
   const title = mainWindow?.getTitle() ?? "";
@@ -79,64 +61,17 @@ const hasNotifications = (): boolean => {
 
 let updateTrayState: () => void = () => {};
 
-const findProxyProfile = (proxyId: string | null): ProxyProfile | null => {
-  if (!proxyId) {
-    return null;
-  }
-
-  return proxyProfiles.find((profile) => profile.id === proxyId) ?? null;
-};
-
-const getActiveProxyProfile = (): ProxyProfile | null => {
-  return findProxyProfile(activeProxyId);
-};
-
-const applyProxyProfile = async (
-  session: Session,
-  proxyId: string | null,
-): Promise<boolean> => {
-  const profile = findProxyProfile(proxyId);
-  const nextActiveProxyId = profile?.id ?? null;
-
-  try {
-    if (profile) {
-      await session.setProxy({
-        mode: "fixed_servers",
-        proxyRules: profile.server,
-        proxyBypassRules: profile.bypassRules,
-      });
-      log.info(`[proxy] applied profile: ${profile.id}`);
-    } else {
-      await session.setProxy({ mode: "direct" });
-      log.info("[proxy] using direct connection");
-    }
-
-    await session.closeAllConnections();
-    activeProxyId = nextActiveProxyId;
-    return true;
-  } catch (error) {
-    log.error("[proxy] failed to apply proxy settings", error);
-    return false;
-  }
-};
-
 const focusWindow = (window: BrowserWindow) => {
   window.show();
   window.focus();
 };
 
 app.on("login", (event, _webContents, _request, authInfo, callback) => {
-  if (!authInfo.isProxy) {
-    return;
-  }
-
-  const profile = getActiveProxyProfile();
-  if (!profile?.username || profile.password === undefined) {
+  if (!proxyRuntime.handleLogin(authInfo, callback)) {
     return;
   }
 
   event.preventDefault();
-  callback(profile.username, profile.password);
 });
 
 const ensureWindow = (): Promise<BrowserWindow> => {
@@ -207,17 +142,9 @@ const ensureWindow = (): Promise<BrowserWindow> => {
       showOnStartupEnabled = enabled;
       settingsStore.set("showOnStartup", enabled);
     },
-    proxyProfiles,
-    getSelectedProxyId: () => selectedProxyId,
-    onSelectProxy: (proxyId) => {
-      const nextProxyId = isKnownProxyProfile(proxyId) ? proxyId : null;
-      if (selectedProxyId === nextProxyId) {
-        return;
-      }
-
-      selectedProxyId = nextProxyId;
-      persistSelectedProxyId(settingsStore, nextProxyId);
-    },
+    proxyProfiles: proxyRuntime.profiles,
+    getSelectedProxyId: proxyRuntime.getSelectedProxyId,
+    onSelectProxy: proxyRuntime.selectProxyForNextLaunch,
   });
 
   mainWindowPromise = (async () => {
@@ -226,7 +153,7 @@ const ensureWindow = (): Promise<BrowserWindow> => {
       throw new Error("Main window is unavailable during initialization");
     }
 
-    await applyProxyProfile(targetWindow.webContents.session, selectedProxyId);
+    await proxyRuntime.applyToSession(targetWindow.webContents.session);
     await targetWindow.loadURL(APP_URL);
 
     return targetWindow;
